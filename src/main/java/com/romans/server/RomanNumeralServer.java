@@ -131,11 +131,13 @@ public class RomanNumeralServer {
                                 "query value must be of type int values 1-3,999. Query string format example: query={11}");
                         return errors.toString();
                     }
-                    
+
                     if (validInt(ins))
                         payload = mapIntToRomanJson(ins).toString();
-                } else
-                    payload = "Invalid query string. Format example: query={11}";
+                } else {
+                    errors.append("Invalid query string. Format example: query={11}");
+                    payload = errors.toString();
+                }
             }
 
             return payload;
@@ -144,13 +146,13 @@ public class RomanNumeralServer {
         private String handleRange(List<NameValuePair> range) {
             String payload = "";
             int[] minMax = new int[2];
-            
+
             for (NameValuePair q : range) {
                 String name = q.getName();
                 if (name.equals("min") || name.equals("max")) {
                     int ins = -1;
                     String qval = q.getValue();
-                    
+
                     try {
                         ins = Integer.parseInt(qval.substring(qval.indexOf("{") + 1, qval.lastIndexOf("}")));
                     } catch (NumberFormatException nfe) {
@@ -158,17 +160,19 @@ public class RomanNumeralServer {
                                 "min and max values must be of type int. Query string format example: min={1}&max={3}");
                         return errors.toString();
                     }
-                    
-                    if(name.equals("min"))
-                        minMax[0] = ins;
-                    else if(name.equals("max"))
-                        minMax[1] = ins;
-                    
-                    payload = getRangePayload(minMax);
 
-                } else
-                    payload = "Invalid query string. Format example: min={1}&max={3}";
+                    if (name.equals("min"))
+                        minMax[0] = ins;
+                    else if (name.equals("max"))
+                        minMax[1] = ins;
+                } else {
+                    errors.append("Invalid query string. Format example: min={1}&max={3}");
+                    payload = errors.toString();
+                }
             }
+
+            if (errors.length() < 1)
+                payload = getRangePayload(minMax);
 
             return payload;
         }
@@ -224,7 +228,7 @@ public class RomanNumeralServer {
          * "{"conversions":[{"input":"4","output":"IV"},{"input":"5","output":"V"},{"input":"6","output":"VI"}]}"
          */
         private String getRangePayload(int[] minMax) {
-          for (int i : minMax) {
+            for (int i : minMax) {
                 if (!validInt(i))
                     return errors.toString();
             }
