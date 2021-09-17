@@ -19,13 +19,23 @@ public class RomanNumeralConversionTest {
 		client = rninjector.getInstance(RomanNumeralClient.class);
 	}
 	
-	@Test
+	@Test //ones
+    public void test3() {
+        assertEquals("III", client.convertInt(3));
+    }
+	
+	@Test //tens
 	public void test34() {
 		assertEquals("XXXIV", client.convertInt(34));
 	}
 	
-	@Test
-	public void test3() {
-		assertEquals("III", client.convertInt(3));
+	@Test //hundreds
+	public void test176() {
+	    assertEquals("CLXXVI", client.convertInt(176));
 	}
+	
+	@Test //thousands
+    public void test3284() {
+        assertEquals("MMMCCLXXXIV", client.convertInt(3284));
+    }
 }
