@@ -155,7 +155,7 @@ public class RomanNumeralServer {
                         ins = Integer.parseInt(qval.substring(qval.indexOf("{") + 1, qval.lastIndexOf("}")));
                     } catch (NumberFormatException nfe) {
                         errors.append(
-                                "query value must be of type int values 1-3,999. Query string format example: query={11}");
+                                "min and max values must be of type int. Query string format example: min={1}&max={3}");
                         return errors.toString();
                     }
                     

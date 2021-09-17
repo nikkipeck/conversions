@@ -104,7 +104,7 @@ public class RomanNumeralServerTest {
     		URL url = new URL("http://localhost:8080/romannumeral?min={4}&max={4000}");
 	    	HttpResponse response = getServerResponse(url);			
 		    assertEquals(400, response.statusCode());
-		    assertEquals("min and max must be values between 1 and 3,999: 4000 not allowed", response.body());
+		    assertEquals("min and max must be values between 1 and 3,999: 0 not allowedmin and max must be values between 1 and 3,999: 4000 not allowed", response.body());
     	}
 		catch(Exception e) {
 			 e.printStackTrace();
