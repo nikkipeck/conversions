@@ -30,8 +30,8 @@ public class RomanNumeralServerClient {
 	public static void main(String[] args) {
 		try {
 			server.startServer();
-			String urlStr = "http://localhost:8080/romannumeral?min={3998}&max={4002}";
-			//String urlStr = "http://localhost:8080/romannumeral?query={23}"; //XXIII
+			String urlStr = "http://localhost:8080/romannumeral?min={30}&max={34}";
+			//String urlStr = "http://localhost:8080/romannumeral?query="; //XXIII
 			//String urlStr = "http://localhost:8080/romannumeral";
 			URL url= new URL(urlStr);
 			URI uri = new URI(url.getProtocol(), url.getUserInfo(), url.getHost(), url.getPort(), url.getPath(), url.getQuery(), url.getRef());

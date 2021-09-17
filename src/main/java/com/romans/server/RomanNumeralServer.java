@@ -15,6 +15,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLDecoder;
+import java.nio.charset.*;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -80,23 +81,20 @@ public class RomanNumeralServer {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             URI requestedUri = exchange.getRequestURI();
-            
+
             String rawQuery = requestedUri.getQuery();
             if (rawQuery == null) {
                 exchange.sendResponseHeaders(400, 0);
                 exchange.close();
                 return;
             }
-            
-            List<NameValuePair> params = URLEncodedUtils.parse(requestedUri, "UTF-8");
-            for (NameValuePair param : params) {
-                System.out.println(param.getName() + " : " + param.getValue());
-            }
-            
+
+            List<NameValuePair> params = URLEncodedUtils.parse(requestedUri, StandardCharsets.UTF_8);
+
             String body = "";
-            if(params.size() == 1)
+            if (params.size() == 1)
                 body = handleQuery(params);
-            else if(params.size() == 2)
+            else if (params.size() == 2)
                 body = handleRange(params);
             else
                 body = "Invalid query string. Format example: query={4}, or min={3}&max={8}";
@@ -113,59 +111,77 @@ public class RomanNumeralServer {
             errors.delete(0, errors.length()); // ugh, but we need to empty the builder
             exchange.close();
         }
-        
+
         private String handleQuery(List<NameValuePair> query) {
-            /*try {
-                qint = Integer.parseInt(query.substring(query.indexOf("{") + 1, query.lastIndexOf("}")));
-            } catch (NumberFormatException nfe) {
-                errors.append(
-                        "query value must be of type int values 1-3,999. Query string format example: query={11}");
-                return errors.toString();
+            String payload = "";
+            for (NameValuePair q : query) {
+                if (q.getName().equals("query")) {
+                    int ins = -1;
+                    String qval = q.getValue();
+
+                    if (qval == null || qval.length() < 1) {
+                        errors.append("query must include a value. Format example: query={939}");
+                        return errors.toString();
+                    }
+
+                    try {
+                        ins = Integer.parseInt(qval.substring(qval.indexOf("{") + 1, qval.lastIndexOf("}")));
+                    } catch (NumberFormatException nfe) {
+                        errors.append(
+                                "query value must be of type int values 1-3,999. Query string format example: query={11}");
+                        return errors.toString();
+                    }
+                    
+                    if (validInt(ins))
+                        payload = mapIntToRomanJson(ins).toString();
+                } else
+                    payload = "Invalid query string. Format example: query={11}";
             }
 
-            if (!validInt(qint))
-                return errors.toString();
-
-            return mapIntToRomanJson(qint).toString();
-*/
-            String payload = "";
-            for(NameValuePair q : query) {
-                if(q.getName().equals("query")) {
-                    int ins = Integer.parseInt(q.getValue());
-                    if(validInt(ins))
-                        payload = getSinglePayload(ins);
-                }
-                else
-                    payload = "Invalid query string. Format example: query={11}";
-            }    
-            
             return payload;
         }
-        
+
         private String handleRange(List<NameValuePair> range) {
             String payload = "";
-            for(NameValuePair q : query) {
-                if(q.getName().equals("query")) {
-                    payload = getSinglePayload(q.getValue());
-                }
-                else
-                    payload = "Invalid query string. Format example: query={11}";
-            }    
+            int[] minMax = new int[2];
             
+            for (NameValuePair q : range) {
+                String name = q.getName();
+                if (name.equals("min") || name.equals("max")) {
+                    int ins = -1;
+                    String qval = q.getValue();
+                    
+                    try {
+                        ins = Integer.parseInt(qval.substring(qval.indexOf("{") + 1, qval.lastIndexOf("}")));
+                    } catch (NumberFormatException nfe) {
+                        errors.append(
+                                "query value must be of type int values 1-3,999. Query string format example: query={11}");
+                        return errors.toString();
+                    }
+                    
+                    if(name.equals("min"))
+                        minMax[0] = ins;
+                    else if(name.equals("max"))
+                        minMax[1] = ins;
+                    
+                    payload = getRangePayload(minMax);
+
+                } else
+                    payload = "Invalid query string. Format example: min={1}&max={3}";
+            }
+
             return payload;
         }
 
         /* decodes query strings according to specified encoding */
-        private String decode(String query) {
-            try {
-                return URLDecoder.decode(query, "UTF-8");
-            } catch (IllegalArgumentException iae) {
-                errors.append("Illegal argument in query. Format example: query={54}");
-            } catch (UnsupportedEncodingException uee) {
-                errors.append("Unsupported encoding detected. Please use UTF-8");
-            }
-            return "";
-        }
+        /*
+         * private String decode(String query) { try { return URLDecoder.decode(query,
+         * "UTF-8"); } catch (IllegalArgumentException iae) {
+         * errors.append("Illegal argument in query. Format example: query={54}"); }
+         * catch (UnsupportedEncodingException uee) {
+         * errors.append("Unsupported encoding detected. Please use UTF-8"); } return
+         * ""; }
+         */
 
         /*
          * split query returns an int[] with min and max values
@@ -175,35 +191,29 @@ public class RomanNumeralServer {
          * 
          * @return int[] with min and max values
          */
-        private int[] splitQuery(String query) throws UnsupportedEncodingException {
-            String decoded = URLDecoder.decode(query, "UTF-8");
-            String[] pairs = decoded.split("&");
-
-            int[] minMax = new int[2];
-
-            for (int i = 0; i < pairs.length; i++) {
-                String pair = pairs[i];
-                int start = pair.indexOf("{") + 1;
-                int end = pair.indexOf("}");
-
-                try {
-                    int mm = Integer.parseInt(pair.substring(start, end));
-                    minMax[i] = mm;
-                } catch (NumberFormatException nfe) {
-                    errors.append(
-                            "min and max values must be of type int. Query string format example: min={1}&max={3}");
-                    return new int[0];
-                }
-            }
-
-            if (minMax.length != 2)
-                errors.append(
-                        "min and max values are required, only min and max are allowed. Query string format example: min={1}&max={3}");
-            if (minMax[0] > minMax[1])
-                errors.append("min value must be less than max value. min " + minMax[0] + ", max " + minMax[1]);
-
-            return minMax;
-        }
+        /*
+         * private int[] splitQuery(String query) throws UnsupportedEncodingException {
+         * String decoded = URLDecoder.decode(query, "UTF-8"); String[] pairs =
+         * decoded.split("&");
+         * 
+         * int[] minMax = new int[2];
+         * 
+         * for (int i = 0; i < pairs.length; i++) { String pair = pairs[i]; int start =
+         * pair.indexOf("{") + 1; int end = pair.indexOf("}");
+         * 
+         * try { int mm = Integer.parseInt(pair.substring(start, end)); minMax[i] = mm;
+         * } catch (NumberFormatException nfe) { errors.append(
+         * "min and max values must be of type int. Query string format example: min={1}&max={3}"
+         * ); return new int[0]; } }
+         * 
+         * if (minMax.length != 2) errors.append(
+         * "min and max values are required, only min and max are allowed. Query string format example: min={1}&max={3}"
+         * ); if (minMax[0] > minMax[1])
+         * errors.append("min value must be less than max value. min " + minMax[0] +
+         * ", max " + minMax[1]);
+         * 
+         * return minMax; }
+         */
 
         /*
          * getRangePayload builds json payload for range requests
@@ -214,7 +224,7 @@ public class RomanNumeralServer {
          * "{"conversions":[{"input":"4","output":"IV"},{"input":"5","output":"V"},{"input":"6","output":"VI"}]}"
          */
         private String getRangePayload(int[] minMax) {
-            for (int i : minMax) {
+          for (int i : minMax) {
                 if (!validInt(i))
                     return errors.toString();
             }
@@ -230,21 +240,18 @@ public class RomanNumeralServer {
          * @return String json payload example query={17} would return
          * "{"input":"17","output":"XVII"}"
          */
-        private String getSinglePayload(String query) {
-            int qint = -1;
-            try {
-                qint = Integer.parseInt(query.substring(query.indexOf("{") + 1, query.lastIndexOf("}")));
-            } catch (NumberFormatException nfe) {
-                errors.append(
-                        "query value must be of type int values 1-3,999. Query string format example: query={11}");
-                return errors.toString();
-            }
-
-            if (!validInt(qint))
-                return errors.toString();
-
-            return mapIntToRomanJson(qint).toString();
-        }
+        /*
+         * private String getSinglePayload(String query) { int qint = -1; try { qint =
+         * Integer.parseInt(query.substring(query.indexOf("{") + 1,
+         * query.lastIndexOf("}"))); } catch (NumberFormatException nfe) {
+         * errors.append(
+         * "query value must be of type int values 1-3,999. Query string format example: query={11}"
+         * ); return errors.toString(); }
+         * 
+         * if (!validInt(qint)) return errors.toString();
+         * 
+         * return mapIntToRomanJson(qint).toString(); }
+         */
 
         /*
          * mapIntToRomanJson will take an integer, convert it to a roman numeral string,
