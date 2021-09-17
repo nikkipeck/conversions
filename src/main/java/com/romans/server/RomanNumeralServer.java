@@ -19,6 +19,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
+
 /**
  * The RomanNumeralServer class sets up a basic HttpServer to listen on port
  * 8080 it serves requests the the romannumeral context
@@ -76,29 +79,30 @@ public class RomanNumeralServer {
          */
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            String body = "";
             URI requestedUri = exchange.getRequestURI();
+            
             String rawQuery = requestedUri.getQuery();
-
             if (rawQuery == null) {
                 exchange.sendResponseHeaders(400, 0);
                 exchange.close();
                 return;
             }
-
-            String query = decode(rawQuery);
-            if (query.contains("&")) {
-                int[] minMax = splitQuery(query);
-
-                if (errors.length() > 0)
-                    body = errors.toString();
-                else
-                    body = getRangePayload(minMax);
-            } else
-                body = getSinglePayload(query);
+            
+            List<NameValuePair> params = URLEncodedUtils.parse(requestedUri, "UTF-8");
+            for (NameValuePair param : params) {
+                System.out.println(param.getName() + " : " + param.getValue());
+            }
+            
+            String body = "";
+            if(params.size() == 1)
+                body = handleQuery(params);
+            else if(params.size() == 2)
+                body = handleRange(params);
+            else
+                body = "Invalid query string. Format example: query={4}, or min={3}&max={8}";
 
             if (errors.length() > 0)
-                exchange.sendResponseHeaders(400, errors.length());
+                exchange.sendResponseHeaders(400, body.length());
             else
                 exchange.sendResponseHeaders(200, body.length());
 
@@ -109,13 +113,54 @@ public class RomanNumeralServer {
             errors.delete(0, errors.length()); // ugh, but we need to empty the builder
             exchange.close();
         }
+        
+        private String handleQuery(List<NameValuePair> query) {
+            /*try {
+                qint = Integer.parseInt(query.substring(query.indexOf("{") + 1, query.lastIndexOf("}")));
+            } catch (NumberFormatException nfe) {
+                errors.append(
+                        "query value must be of type int values 1-3,999. Query string format example: query={11}");
+                return errors.toString();
+            }
+
+            if (!validInt(qint))
+                return errors.toString();
+
+            return mapIntToRomanJson(qint).toString();
+*/
+            String payload = "";
+            for(NameValuePair q : query) {
+                if(q.getName().equals("query")) {
+                    int ins = Integer.parseInt(q.getValue());
+                    if(validInt(ins))
+                        payload = getSinglePayload(ins);
+                }
+                else
+                    payload = "Invalid query string. Format example: query={11}";
+            }    
+            
+            return payload;
+        }
+        
+        private String handleRange(List<NameValuePair> range) {
+            String payload = "";
+            for(NameValuePair q : query) {
+                if(q.getName().equals("query")) {
+                    payload = getSinglePayload(q.getValue());
+                }
+                else
+                    payload = "Invalid query string. Format example: query={11}";
+            }    
+            
+            return payload;
+        }
 
         /* decodes query strings according to specified encoding */
         private String decode(String query) {
             try {
                 return URLDecoder.decode(query, "UTF-8");
             } catch (IllegalArgumentException iae) {
-                errors.append("Illegal argument in query. Format example:; query={54}");
+                errors.append("Illegal argument in query. Format example: query={54}");
             } catch (UnsupportedEncodingException uee) {
                 errors.append("Unsupported encoding detected. Please use UTF-8");
             }
@@ -237,18 +282,15 @@ public class RomanNumeralServer {
         }
 
         /*
-         * validInt takes an integer and checks if it is in an allowable range
+         * validInt checks if int it is in an allowable range
          * 
          * @param int
-         * 
-         * @return boolean
          */
         private boolean validInt(int toCheck) {
             if (toCheck < 1 || toCheck > 3999) {
                 errors.append("min and max must be values between 1 and 3,999: " + toCheck + " not allowed");
                 return false;
             }
-
             return true;
         }
     }
